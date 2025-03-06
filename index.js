@@ -24,6 +24,7 @@ let pb = null;
 const messageCounters = new Map();
 const MESSAGE_THRESHOLD = 3;
 const IKLAN_FOLDER = "./asset/iklan";
+const QURAN_FOLDER = "./asset/quran";
 
 // Add array of advertising messages
 const AUTO_RESPONSE_MESSAGES = [
@@ -479,6 +480,29 @@ async function connectToWhatsApp() {
             client.send(wsData);
           }
         });
+
+        // Check for surah command
+        const surahMatch = conversationText.match(/^bacaan surah (.+)$/i);
+        if (surahMatch) {
+          try {
+            const requestedSurah = surahMatch[1];
+            const surahData = await getSurahData(requestedSurah);
+
+            if (surahData) {
+              const formattedText = formatSurahText(surahData);
+              await sock.sendMessage(msg.key.remoteJid, {text: formattedText});
+            } else {
+              await sock.sendMessage(msg.key.remoteJid, {
+                text: "Maaf, surah tidak ditemukan. Pastikan nama surah benar.",
+              });
+            }
+          } catch (error) {
+            console.error("Error handling surah command:", error);
+            await sock.sendMessage(msg.key.remoteJid, {
+              text: "Maaf, terjadi kesalahan saat memproses permintaan.",
+            });
+          }
+        }
       }
     }
   });
@@ -545,6 +569,81 @@ function getRandomMessage() {
   return AUTO_RESPONSE_MESSAGES[
     Math.floor(Math.random() * AUTO_RESPONSE_MESSAGES.length)
   ];
+}
+
+// Add this function to normalize surah names for comparison
+function normalizeSurahName(name) {
+  return name
+    .toLowerCase()
+    .replace(/['-]/g, "") // Remove hyphens and apostrophes
+    .replace(/\s+/g, ""); // Remove spaces
+}
+
+// Add this function to get surah data
+async function getSurahData(surahName) {
+  try {
+    const files = fs.readdirSync(QURAN_FOLDER);
+
+    for (const file of files) {
+      const surahData = JSON.parse(
+        fs.readFileSync(path.join(QURAN_FOLDER, file), "utf8")
+      );
+
+      // Pastikan data dan namaLatin ada
+      if (surahData && surahData.data && surahData.data.namaLatin) {
+        const normalizedNameLatin = normalizeSurahName(
+          surahData.data.namaLatin
+        );
+        const normalizedInput = normalizeSurahName(surahName);
+
+        if (normalizedNameLatin === normalizedInput) {
+          return surahData.data;
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Error reading surah data:", error);
+    return null;
+  }
+}
+
+// Add this function to format surah text
+function formatSurahText(surah) {
+  try {
+    // Validasi data surah
+    if (!surah || !surah.namaLatin || !surah.nama || !surah.ayat) {
+      throw new Error("Data surah tidak lengkap");
+    }
+
+    let text = `*Surah ${surah.namaLatin} (${surah.nama})*\n`;
+    text += `Nomor: ${surah.nomor}\n`;
+    text += `Jumlah Ayat: ${surah.jumlahAyat}\n\n`;
+
+    // Check if audioFull exists and has the "05" property
+    const audioLink =
+      surah.audioFull && surah.audioFull["05"]
+        ? `Link Audio Full Surah:\n${surah.audioFull["05"]}\n\n`
+        : "";
+    text += audioLink;
+
+    // Pastikan ayat adalah array sebelum menggunakan forEach
+    if (Array.isArray(surah.ayat)) {
+      surah.ayat.forEach((ayat) => {
+        if (ayat && ayat.nomorAyat) {
+          text += `*Ayat ${ayat.nomorAyat}*\n`;
+          text += `${ayat.teksArab || ""}\n`;
+          text += `${ayat.teksLatin || ""}\n`;
+          text += `${ayat.teksIndonesia || ""}\n\n`;
+        }
+      });
+    }
+
+    return text;
+  } catch (error) {
+    console.error("Error formatting surah text:", error);
+    return "Maaf, terjadi kesalahan saat memformat data surah.";
+  }
 }
 
 // Start server and WhatsApp connection
