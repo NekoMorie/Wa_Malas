@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhatsApp Bot Interface</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f0f2f5;
+      }
+      .message {
+        background-color: white;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 10px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        position: relative;
+        animation: fadeIn 0.3s ease-in;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .message.from-me {
+        background-color: #dcf8c6;
+        margin-left: 100px;
+      }
+      .message-header {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+      .message-info {
+        flex: 1;
+      }
+      .message-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .message-content {
+        margin-top: 10px;
+        word-break: break-word;
+      }
+      .send-form {
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin: 20px 0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 20px;
+        z-index: 100;
+      }
+      input, textarea {
+        width: 100%;
+        padding: 8px;
+        margin: 5px 0;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+      }
+      button {
+        background-color: #25d366;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      button:hover {
+        background-color: #128c7e;
+      }
+      .qr-link {
+        display: inline-block;
+        margin: 20px 0;
+        padding: 10px 20px;
+        background-color: #128c7e;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: bold;
+      }
+      .qr-link:hover {
+        background-color: #0a6b5c;
+      }
+      .media-content {
+        max-width: 300px;
+        margin: 10px 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .media-content img,
+      .media-content video {
+        max-width: 100%;
+        border-radius: 8px;
+      }
+      .media-content audio {
+        width: 100%;
+        margin: 10px 0;
+      }
+      .quoted-message {
+        background-color: rgba(0, 0, 0, 0.05);
+        border-left: 4px solid #128c7e;
+        padding: 8px;
+        margin: 5px 0;
+        border-radius: 0 5px 5px 0;
+        font-size: 0.9em;
+      }
+      .message-type {
+        font-size: 0.8em;
+        color: #888;
+        text-transform: uppercase;
+        background-color: rgba(0, 0, 0, 0.05);
+        padding: 2px 6px;
+        border-radius: 3px;
+      }
+      .reactions {
+        display: flex;
+        gap: 5px;
+        margin-top: 5px;
+      }
+      .reaction {
+        background-color: rgba(0, 0, 0, 0.05);
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 0.9em;
+      }
+      .mentions {
+        color: #128c7e;
+        font-weight: bold;
+      }
+      .contact-card {
+        background-color: rgba(0, 0, 0, 0.05);
+        padding: 10px;
+        border-radius: 5px;
+        margin: 5px 0;
+      }
+      .location-card {
+        background-color: rgba(0, 0, 0, 0.05);
+        padding: 10px;
+        border-radius: 5px;
+        margin: 5px 0;
+      }
+      .location-link {
+        color: #128c7e;
+        text-decoration: none;
+        display: inline-block;
+        margin-top: 5px;
+      }
+      .location-link:hover {
+        text-decoration: underline;
+      }
+      .message-status {
+        font-size: 0.8em;
+        color: #888;
+      }
+      .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .connection-status {
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 0.9em;
+        font-weight: bold;
+      }
+      .connected {
+        background-color: #25d366;
+        color: white;
+      }
+      .disconnected {
+        background-color: #dc3545;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header-container">
+      <h1>WhatsApp Bot Interface</h1>
+      <div id="connection-status" class="connection-status disconnected">Disconnected</div>
+    </div>
+
+    <a href="/qr" class="qr-link">View QR Code</a>
+
+    <div class="send-form">
+      <h2>Send Message</h2>
+      <form id="sendForm">
+        <input
+          type="text"
+          id="number"
+          placeholder="Phone number (e.g., 6281234567890)"
+          required
+        />
+        <textarea
+          id="message"
+          placeholder="Type your message"
+          required
+          rows="3"
+        ></textarea>
+        <button type="submit">Send Message</button>
+      </form>
+    </div>
+
+    <h2>Recent Messages</h2>
+    <div id="messages">
+      <% messages.forEach(function(msg) { %>
+      <div class="message <%= msg.fromMe ? 'from-me' : '' %>" id="msg-<%= msg.id %>">
+        <div class="message-header">
+          <div class="message-info">
+            <strong><%= msg.pushName %></strong> (<%= msg.from %>)<br />
+            <small><%= msg.timestamp %></small>
+          </div>
+          <div class="message-meta">
+            <span class="message-type"><%= msg.type %></span>
+            <% if (msg.fromMe) { %>
+              <span class="message-status">✓✓</span>
+            <% } %>
+          </div>
+        </div>
+
+        <% if (msg.quoted) { %>
+        <div class="quoted-message">
+          <small>
+            <strong><%= msg.quoted.name || msg.quoted.participant %>:</strong><br />
+            <%= msg.quoted.text %>
+          </small>
+        </div>
+        <% } %>
+
+        <div class="message-content">
+          <% if (msg.type === 'conversation' || msg.type === 'extendedTextMessage') { %>
+            <%= msg.type === 'extendedTextMessage' ? msg.content.text : msg.text %>
+            
+            <% if (msg.mentions && msg.mentions.length > 0) { %>
+              <div class="mentions">
+                Mentions: <%= msg.mentions.map(m => formatPhoneNumber(m)).join(', ') %>
+              </div>
+            <% } %>
+
+          <% } else if (msg.type === 'imageMessage') { %>
+            <div class="media-content">
+              <img src="<%= msg.mediaPath %>" alt="Image" loading="lazy" />
+              <% if (msg.caption) { %>
+                <p><%= msg.caption %></p>
+              <% } %>
+            </div>
+
+          <% } else if (msg.type === 'videoMessage') { %>
+            <div class="media-content">
+              <video controls>
+                <source src="<%= msg.mediaPath %>" type="<%= msg.mimetype %>">
+                Your browser does not support the video tag.
+              </video>
+              <% if (msg.caption) { %>
+                <p><%= msg.caption %></p>
+              <% } %>
+            </div>
+
+          <% } else if (msg.type === 'audioMessage') { %>
+            <div class="media-content">
+              <audio controls <%= msg.ptt ? 'controlsList="nodownload"' : '' %>>
+                <source src="<%= msg.mediaPath %>" type="<%= msg.mimetype %>">
+                Your browser does not support the audio element.
+              </audio>
+              <small><%= msg.seconds %>s <%= msg.ptt ? '(Voice Note)' : '' %></small>
+            </div>
+
+          <% } else if (msg.type === 'stickerMessage') { %>
+            <div class="media-content">
+              <img src="<%= msg.mediaPath %>" alt="Sticker" />
+              <% if (msg.isAnimated) { %>
+                <small>(Animated Sticker)</small>
+              <% } %>
+            </div>
+
+          <% } else if (msg.type === 'documentMessage') { %>
+            <div class="document-content">
+              <p>📄 <%= msg.fileName %></p>
+              <small>
+                Type: <%= msg.mimetype %>
+                <% if (msg.pageCount) { %>
+                  | Pages: <%= msg.pageCount %>
+                <% } %>
+              </small>
+            </div>
+
+          <% } else if (msg.type === 'contactMessage' || msg.type === 'contactsArrayMessage') { %>
+            <% msg.contacts.forEach(function(contact) { %>
+              <div class="contact-card">
+                <strong>👤 <%= contact.displayName || 'Contact' %></strong><br />
+                <small><%= contact.vcard %></small>
+              </div>
+            <% }); %>
+
+          <% } else if (msg.type === 'locationMessage') { %>
+            <div class="location-card">
+              <strong>📍 <%= msg.name || 'Location' %></strong>
+              <% if (msg.address) { %>
+                <p><%= msg.address %></p>
+              <% } %>
+              <a
+                href="https://www.google.com/maps?q=<%= msg.degreesLatitude %>,<%= msg.degreesLongitude %>"
+                target="_blank"
+                class="location-link"
+              >
+                View on Google Maps
+              </a>
+            </div>
+          <% } %>
+
+          <% if (msg.reactions && msg.reactions.length > 0) { %>
+            <div class="reactions">
+              <% msg.reactions.forEach(function(reaction) { %>
+                <span class="reaction">
+                  <%= reaction.text %>
+                  <small>(<%= formatPhoneNumber(reaction.key.participant) %>)</small>
+                </span>
+              <% }); %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+      <% }); %>
+    </div>
+
+    <script>
+      const messagesContainer = document.getElementById('messages');
+      const connectionStatus = document.getElementById('connection-status');
+      
+      // Create WebSocket connection
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+      ws.onopen = () => {
+        connectionStatus.textContent = 'Connected';
+        connectionStatus.classList.remove('disconnected');
+        connectionStatus.classList.add('connected');
+      };
+
+      ws.onclose = () => {
+        connectionStatus.textContent = 'Disconnected';
+        connectionStatus.classList.remove('connected');
+        connectionStatus.classList.add('disconnected');
+      };
+
+      // Function to load chat history from local storage
+      function loadChatHistory() {
+        if (typeof(Storage) !== 'undefined') {
+          messagesContainer.innerHTML = ''; // Clear existing messages
+          const chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+          // Reverse the array to show newest messages at the top
+          const reversedHistory = [...chatHistory].reverse();
+          const messageIds = new Set(reversedHistory.map(msg => msg.id)); // Track message IDs
+          
+          reversedHistory.forEach((message) => {
+            const messageHtml = createMessageHtml(message);
+            messagesContainer.insertAdjacentHTML('beforeend', messageHtml);
+          });
+          return messageIds;
+        } else {
+          console.warn('Local storage is not supported in this browser.');
+          return new Set();
+        }
+      }
+
+      // Load chat history when the page is loaded
+      const existingMessageIds = loadChatHistory();
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log('Received message:', data);
+        if (data.type === 'new_message') {
+          // Check for duplicate messages
+          if (!existingMessageIds.has(data.message.id)) {
+            // Add new message to the top of the list
+            const messageHtml = createMessageHtml(data.message);
+            messagesContainer.insertAdjacentHTML('afterbegin', messageHtml);
+
+            // Store all messages in local storage
+            if (typeof(Storage) !== 'undefined') {
+              const chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+              chatHistory.push(data.message);
+              localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+              existingMessageIds.add(data.message.id); // Add to set of IDs
+            } else {
+              console.warn('Local storage is not supported in this browser.');
+            }
+          }
+        }
+      };
+
+      document.getElementById('sendForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const number = document.getElementById('number').value;
+        const message = document.getElementById('message').value;
+
+        try {
+          const response = await fetch('/send', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ number, message }),
+          });
+
+          const result = await response.json();
+          if (result.success) {
+            document.getElementById('message').value = '';
+          } else {
+            alert('Error: ' + result.error);
+          }
+        } catch (error) {
+          alert('Error sending message: ' + error.message);
+        }
+      });
+
+      function formatPhoneNumber(jid) {
+        return jid.replace('@s.whatsapp.net', '');
+      }
+
+      // Helper function to create message HTML
+      function createMessageHtml(msg) {
+        const fromMeClass = msg.fromMe ? 'from-me' : '';
+        const messageType = msg.type || 'conversation';
+        const timestamp = msg.timestamp || 'Unknown Date';
+        let contentHtml = '';
+
+        // Handle media messages
+        if (msg.mediaPath) {
+          if (messageType === 'imageMessage') {
+            contentHtml = `<div class="media-content"><img src="${msg.mediaPath}" alt="Image" loading="lazy" /></div>`;
+          } else if (messageType === 'videoMessage') {
+            contentHtml = `<div class="media-content"><video controls><source src="${msg.mediaPath}" type="${msg.mimetype}">Your browser does not support the video tag.</video></div>`;
+          } else if (messageType === 'audioMessage') {
+            contentHtml = `<div class="media-content"><audio controls ${msg.ptt ? 'controlsList="nodownload"' : ''}><source src="${msg.mediaPath}" type="${msg.mimetype}">Your browser does not support the audio element.</audio></div>`;
+          }
+        } 
+        // Handle text messages
+        else if (messageType === 'conversation' || messageType === 'extendedTextMessage') {
+          contentHtml = msg.content || '';
+        }
+        // Handle location messages
+        else if (messageType === 'locationMessage') {
+          try {
+            const locationData = JSON.parse(msg.content);
+            if (locationData.locationMessage) {
+              const { degreesLatitude, degreesLongitude } = locationData.locationMessage;
+              contentHtml = `
+                <div class="location-card">
+                  <strong>📍 Location</strong>
+                  <a href="https://www.google.com/maps?q=${degreesLatitude},${degreesLongitude}" 
+                     target="_blank" 
+                     class="location-link">
+                    View on Google Maps (${degreesLatitude}, ${degreesLongitude})
+                  </a>
+                </div>
+              `;
+            }
+          } catch (error) {
+            console.error('Error parsing location data:', error);
+            contentHtml = '<div class="error">Error displaying location</div>';
+          }
+        }
+
+        const messageHtml = `
+          <div class="message ${fromMeClass}" id="msg-${msg.id}">
+            <div class="message-header">
+              <div class="message-info">
+                <strong>${msg.pushName || 'Unknown'}</strong> (${msg.from})<br />
+                <small>${timestamp}</small>
+              </div>
+              <div class="message-meta">
+                <span class="message-type">${messageType}</span>
+                ${msg.fromMe ? '<span class="message-status">✓✓</span>' : ''}
+              </div>
+            </div>
+            <div class="message-content">
+              ${contentHtml}
+            </div>
+          </div>
+        `;
+        return messageHtml;
+      }
+
+      // Remove WebSocket event handler when the page is unloaded
+      window.onunload = () => {
+        ws.onmessage = null;
+      };
+    </script>
+  </body>
+</html>

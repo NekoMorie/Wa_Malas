@@ -1,0 +1,20 @@
+{
+  "name": "wa-baileys-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp bot using Baileys and EJS",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@whiskeysockets/baileys": "^6.5.0",
+    "axios": "^1.8.1",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "fluent-ffmpeg": "^2.1.3",
+    "pocketbase": "^0.25.1",
+    "qrcode": "^1.5.3",
+    "ws": "^8.18.0"
+  }
+}

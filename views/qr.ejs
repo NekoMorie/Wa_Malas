@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhatsApp QR Code</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        background-color: #f0f2f5;
+      }
+      .container {
+        text-align: center;
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+      img {
+        max-width: 300px;
+        margin: 20px 0;
+      }
+      .back-link {
+        margin-top: 20px;
+        color: #128c7e;
+        text-decoration: none;
+      }
+      .back-link:hover {
+        text-decoration: underline;
+      }
+      .status-message {
+        color: #128c7e;
+        font-weight: bold;
+        margin: 10px 0;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Scan QR Code</h1>
+      <p>Use WhatsApp on your phone to scan this QR code</p>
+      <div id="qrcode">
+        <img
+          id="qr-image"
+          src=""
+          alt="WhatsApp QR Code"
+          style="display: none"
+        />
+      </div>
+      <p id="status-message" class="status-message">Waiting for QR code...</p>
+      <br />
+      <a href="/" class="back-link">Back to Dashboard</a>
+    </div>
+
+    <script>
+      const qrImage = document.getElementById("qr-image");
+      const statusMessage = document.getElementById("status-message");
+
+      // Create WebSocket connection
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+      ws.onmessage = function (event) {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "qr") {
+          qrImage.src = data.qr;
+          qrImage.style.display = "block";
+          statusMessage.style.display = "none";
+        } else if (data.type === "status" && data.status === "connected") {
+          qrImage.style.display = "none";
+          statusMessage.textContent = "WhatsApp Connected!";
+          statusMessage.style.display = "block";
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 2000);
+        }
+      };
+
+      ws.onclose = function () {
+        statusMessage.textContent = "Connection lost. Please refresh the page.";
+        statusMessage.style.display = "block";
+        qrImage.style.display = "none";
+      };
+
+      // Show initial status message
+      statusMessage.style.display = "block";
+    </script>
+  </body>
+</html>
