@@ -25,13 +25,13 @@ const messageCounters = new Map();
 const MESSAGE_THRESHOLD = 3;
 const IKLAN_FOLDER = "./asset/iklan";
 const QURAN_FOLDER = "./asset/quran";
+const lastAdTime = new Map(); // Track last ad time per user
 
 // Add array of advertising messages
 const AUTO_RESPONSE_MESSAGES = [
-  "🌟 Promo Spesial! Dapatkan diskon 50% untuk pembelian pertama",
-  "✨ Penawaran terbaik minggu ini! Jangan sampai terlewat",
-  "💫 Special Deal! Hanya untuk hari ini",
-  "🎉 Promo Ekslusif! Segera kunjungi toko kami",
+  "Percantik hari-harimu dengan sentuhan lembut dari Wardah! ✨ Hadir dengan rangkaian produk halal dan berkualitas, yang dirancang untuk menjaga kecantikan alami dan merawat kulitmu dengan penuh kelembutan. Temukan kepercayaan diri dalam setiap senyuman, karena Wardah selalu ada untuk menemani setiap langkahmu. Cantik dari hati, bersinar di setiap momen! 🌸\n\n#WardahBeauty #CantikDariHati #SelaluAdaBahagia #GlowWithWardah #HalalBeauty #PercayaDiriBersamaWardah\n\nInstagram @wardahbeauty \nhttps://www.instagram.com/wardahbeauty?igsh=dmgyMWZvOWxqanlz ",
+  "💧 Segarnya alami, manfaatnya nyata! Le Minerale hadir dengan kandungan mineral alami yang menyehatkan, memberikan hidrasi yang lebih segar dan berkualitas. Setiap tegukan menghadirkan sensasi unik, seperti ada manis-manisnya! ✨ Rasakan perbedaannya dan jadikan Le Minerale pilihan utama untuk menjaga kesehatan keluarga. Le Minerale, lebih dari sekadar air mineral! 💦\n\n#LeMinerale #SepertiAdaManisManisnya #LebihDariSekadarAirMineral #HidrasiSehat #SegarnyaBeda #SehatSetiapTetes\n\nInstagram @le_mineraleid \nhttps://www.instagram.com/le_mineraleid?igsh=Mmd0cXBmb2lzOTY1",
+  "Nikmati kesegaran alami dengan Teh Botol Sosro!🍻 Dibuat dari teh pilihan dan gula asli, menghadirkan rasa autentik yang tak tergantikan. Setiap tegukan membawa kesejukan dan kebaikan dalam satu botol. Teh Botol Sosro, selalu ada di setiap momen berharga!👫\n\n#TehBotolSosro #SebotolKebaikan #RasakanKesegaran #100PersenAsli #SelaluAdaSelaluBersama #TehAsliTehKita\n\nInstagram @tehbotolsosroid\nhttps://www.instagram.com/tehbotolsosroid?igsh=MXA4cG96YnJjb2NvaA==",
 ];
 
 // Initialize PocketBase
@@ -191,7 +191,67 @@ async function connectToWhatsApp() {
           textContent = content.extendedTextMessage?.text;
         }
 
-        // Handle all "1#" messages here
+        // Track "bacaan" requests
+        if (textContent && textContent.toLowerCase().includes("bacaan")) {
+          const currentCount = messageCounters.get(sender) || 0;
+          messageCounters.set(sender, currentCount + 1);
+
+          // Check if threshold reached
+          if (currentCount + 1 >= MESSAGE_THRESHOLD) {
+            // Reset counter
+            messageCounters.set(sender, 0);
+
+            // Check if we've sent an ad in the last 24 hours
+            const lastTime = lastAdTime.get(sender) || 0;
+            const now = Date.now();
+            const hasShownAdToday = now - lastTime < 24 * 60 * 60 * 1000;
+
+            if (!hasShownAdToday) {
+              // Haven't shown ad today, send image ad
+              const iklanData = await getRandomIklan();
+              if (iklanData) {
+                // Get corresponding message for this iklan
+                const message =
+                  AUTO_RESPONSE_MESSAGES[iklanData.index] ||
+                  AUTO_RESPONSE_MESSAGES[0];
+                await sock.sendMessage(sender, {
+                  image: {url: iklanData.path},
+                  caption: message,
+                });
+                // Update last ad time
+                lastAdTime.set(sender, now);
+              }
+            }
+          }
+        }
+
+        // Check for surah command
+        const surahMatch = textContent.match(
+          /^bacaan surah (.+?)(?: ayat (\d+(?:-\d+)?))?\s*$/i
+        );
+        if (surahMatch) {
+          try {
+            const [, requestedSurah, verseRange] = surahMatch;
+            const surahData = await getSurahData(requestedSurah);
+
+            if (surahData) {
+              const verses = verseRange ? parseVerseRange(verseRange) : null;
+              const formattedText = formatSurahText(surahData, verses, sender);
+              await sock.sendMessage(msg.key.remoteJid, {text: formattedText});
+            } else {
+              await sock.sendMessage(msg.key.remoteJid, {
+                text: "Maaf, surah tidak ditemukan. Pastikan nama surah benar.",
+              });
+            }
+          } catch (error) {
+            console.error("Error handling surah command:", error);
+            await sock.sendMessage(msg.key.remoteJid, {
+              text: "Maaf, terjadi kesalahan saat memproses permintaan.",
+            });
+          }
+        }
+
+        // Handle other existing message types (1#, etc)
         if (textContent && textContent.startsWith("1#")) {
           const reportText = textContent.substring(2).trim();
 
@@ -480,29 +540,6 @@ async function connectToWhatsApp() {
             client.send(wsData);
           }
         });
-
-        // Check for surah command
-        const surahMatch = conversationText.match(/^bacaan surah (.+)$/i);
-        if (surahMatch) {
-          try {
-            const requestedSurah = surahMatch[1];
-            const surahData = await getSurahData(requestedSurah);
-
-            if (surahData) {
-              const formattedText = formatSurahText(surahData);
-              await sock.sendMessage(msg.key.remoteJid, {text: formattedText});
-            } else {
-              await sock.sendMessage(msg.key.remoteJid, {
-                text: "Maaf, surah tidak ditemukan. Pastikan nama surah benar.",
-              });
-            }
-          } catch (error) {
-            console.error("Error handling surah command:", error);
-            await sock.sendMessage(msg.key.remoteJid, {
-              text: "Maaf, terjadi kesalahan saat memproses permintaan.",
-            });
-          }
-        }
       }
     }
   });
@@ -556,8 +593,19 @@ function getRandomIklan() {
       throw new Error("No image files found in iklan folder");
     }
 
-    const randomFile = files[Math.floor(Math.random() * files.length)];
-    return path.join(IKLAN_FOLDER, randomFile);
+    // Sort files to ensure consistent ordering
+    files.sort();
+
+    const randomIndex = Math.floor(Math.random() * files.length);
+    const randomFile = files[randomIndex];
+
+    // Extract index from filename (e.g., "iklan1.jpg" -> 1)
+    const fileIndex = parseInt(randomFile.match(/\d+/)[0]) - 1;
+
+    return {
+      path: path.join(IKLAN_FOLDER, randomFile),
+      index: fileIndex,
+    };
   } catch (error) {
     console.error("Error getting random iklan:", error);
     return null;
@@ -608,29 +656,74 @@ async function getSurahData(surahName) {
   }
 }
 
-// Add this function to format surah text
-function formatSurahText(surah) {
+// Add this function to parse verse range
+function parseVerseRange(rangeStr) {
+  if (!rangeStr) return null;
+
+  // Check if it's a range (e.g., "1-4") or single number
+  const match = rangeStr.match(/^(\d+)(?:-(\d+))?$/);
+  if (!match) return null;
+
+  const start = parseInt(match[1]);
+  const end = match[2] ? parseInt(match[2]) : start;
+
+  return {start, end};
+}
+
+// Modify the format surah text function
+function formatSurahText(surah, verses = null, sender) {
   try {
     // Validasi data surah
     if (!surah || !surah.namaLatin || !surah.nama || !surah.ayat) {
       throw new Error("Data surah tidak lengkap");
     }
 
-    let text = `*Surah ${surah.namaLatin} (${surah.nama})*\n`;
-    text += `Nomor: ${surah.nomor}\n`;
-    text += `Jumlah Ayat: ${surah.jumlahAyat}\n\n`;
+    let text = "";
 
-    // Check if audioFull exists and has the "05" property
-    const audioLink =
-      surah.audioFull && surah.audioFull["05"]
-        ? `Link Audio Full Surah:\n${surah.audioFull["05"]}\n\n`
-        : "";
-    text += audioLink;
+    // Check message counter and last ad time
+    const currentCount = messageCounters.get(sender) || 0;
+    const lastTime = lastAdTime.get(sender) || 0;
+    const now = Date.now();
+    const hasShownAdToday = now - lastTime < 24 * 60 * 60 * 1000;
+
+    // Add slogan if threshold reached and we've already shown an ad today
+    if (currentCount + 1 >= MESSAGE_THRESHOLD && hasShownAdToday) {
+      // Get the index of the last shown ad for this user
+      const lastAdIndex = messageCounters.get(`${sender}_last_ad_index`) || 0;
+      const message =
+        AUTO_RESPONSE_MESSAGES[lastAdIndex] || AUTO_RESPONSE_MESSAGES[0];
+      text += `${message}\n\n`;
+      // Reset counter
+      messageCounters.set(sender, 0);
+    }
+
+    // Add surah information
+    text += `*Surah ${surah.namaLatin} (${surah.nama})*\n`;
+    text += `Nomor: ${surah.nomor}\n`;
+
+    // If verses specified, show range info
+    if (verses) {
+      if (verses.start < 1 || verses.end > surah.jumlahAyat) {
+        return `Maaf, ayat yang diminta di luar jangkauan. Surah ${surah.namaLatin} memiliki ${surah.jumlahAyat} ayat.`;
+      }
+      text += `Ayat: ${verses.start}${
+        verses.start !== verses.end ? `-${verses.end}` : ""
+      }\n`;
+    }
+    text += `Jumlah Ayat: ${surah.jumlahAyat}\n\n`;
 
     // Pastikan ayat adalah array sebelum menggunakan forEach
     if (Array.isArray(surah.ayat)) {
       surah.ayat.forEach((ayat) => {
         if (ayat && ayat.nomorAyat) {
+          // Skip if verse number is outside requested range
+          if (
+            verses &&
+            (ayat.nomorAyat < verses.start || ayat.nomorAyat > verses.end)
+          ) {
+            return;
+          }
+
           text += `*Ayat ${ayat.nomorAyat}*\n`;
           text += `${ayat.teksArab || ""}\n`;
           text += `${ayat.teksLatin || ""}\n`;
